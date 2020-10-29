@@ -3,9 +3,10 @@ const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
-
 const session = require('express-session');
 const MongoDBStore = require('connect-mongodb-session')(session);
+const csrf = require('csurf');
+const flash = require('connect-flash');
 
 // Model Imports
 const User = require('./models/user');
@@ -13,13 +14,15 @@ const User = require('./models/user');
 // Controller imports
 const errorController = require('./controllers/error')
 
-const MONGODB_URI = 'mongodb+srv://erik:zADMolQHeaLwcjlY@cluster0.xvm3h.mongodb.net/shop';
+// MongoDB Connection
+const MONGODB_URI = 'MongoDB url';
 
 const app = express(); 
 const store = new MongoDBStore({
     uri: MONGODB_URI,
     collection: 'sessions',
 });
+const csrfProtection = csrf();
 
 // Sets template engine
 app.set('view engine', 'ejs');
@@ -40,8 +43,10 @@ app.use(session({
     store: store,
  })
 );
+app.use(csrfProtection);
+app.use(flash());
 
-//Gets a mongoose model user from the session to be used in requests
+//Gets a mongoose model User from the session that is accessible in all requests
 app.use((req, res, next) => {
     if (!req.session.user) {
         return next();
@@ -54,29 +59,24 @@ app.use((req, res, next) => {
     .catch(err => console.log(err));
 })
 
+// Sets isLoggedIn and csrfToken for each request when views are rendered
+app.use((req, res, next) => {
+    res.locals.isAuthenticated = req.session.isLoggedIn;
+    res.locals.csrfToken = req.csrfToken();
+    next();
+})
+
+// Routes
 app.use('/admin', adminRoutes);
 app.use(shopRoutes);
 app.use(authRoutes);
 
-// 404 Page Not Found
+// 404 Error Route
 app.use(errorController.get404)
 
 mongoose
     .connect(MONGODB_URI)
     .then(result => {
-        User.findOne().then(user => {
-            if (!user) {
-                const user = new User({
-                    name: 'Erik',
-                    email: 'erik@mail.com',
-                    cart: {
-                        items: []
-                    },
-                });
-                user.save();
-            }
-        });
-        console.log('Connected!')
         app.listen(3000);
     })
     .catch(err => console.log(err));

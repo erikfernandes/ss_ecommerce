@@ -5,7 +5,6 @@ exports.getAddProduct = (req, res, next) => {
         pageTitle: 'Add Product', 
         path: '/admin/add-product',
         editing: false,
-        isAuthenticated: req.session.isLoggedIn,
     });
 };
 
@@ -48,7 +47,6 @@ exports.getEditProduct = (req, res, next) => {
                 path: '/admin/edit-product',
                 editing: editMode,
                 product: product,
-                isAuthenticated: req.session.isLoggedIn,
             });
         })
         .catch(err => console.log(err));
@@ -65,27 +63,30 @@ exports.postEditProduct = (req, res, next) => {
     // Find existing product and update fields
     Product.findById(prodId)
         .then(product => {
+            // Checks if userId in request is authorized to edit a given product
+            if (product.userId.toString() !== req.user._id.toString()) {
+                return res.redirect('/');
+            }
             product.title = updatedTitle;
             product.imageUrl = updatedImageUrl;
             product.description = updatedDescription;
             product.price = updatedPrice;
-            return product.save()
-        })
-        .then(result => {
-            console.log('Updated Product!');
-            res.redirect('/admin/all-products');
+            return product.save().then(result => {
+                console.log('Updated Product!');
+                res.redirect('/admin/all-products');
+            })
         })
         .catch(err => console.log(err));
 };
 
 exports.getProducts = (req, res, next) => {
-    Product.find()
+    // Only gets products from db that correspond to logged in user
+    Product.find({userId: req.user._id})
         .then(products => {
             res.render('admin/all-products', {
                 prods: products, 
                 pageTitle: 'Admin Products', 
                 path: '/admin/all-products',
-                isAuthenticated: req.session.isLoggedIn,
             });
         })
         .catch(err => {
@@ -96,7 +97,7 @@ exports.getProducts = (req, res, next) => {
 exports.postDeleteProduct = (req, res, next) => {
     const prodId = req.body.productId;
     Product
-        .findByIdAndRemove(prodId)
+        .deleteOne({_id: prodId, userId: req.user._id})
         .then(() => {
             console.log('Deleted Product!');
             res.redirect('/admin/all-products');
