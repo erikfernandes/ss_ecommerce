@@ -15,13 +15,15 @@ const User = require('./models/user');
 const errorController = require('./controllers/error')
 
 // MongoDB Connection
-const MONGODB_URI = 'MongoDB url';
+const MONGODB_URI = '';
 
 const app = express(); 
 const store = new MongoDBStore({
     uri: MONGODB_URI,
     collection: 'sessions',
 });
+
+// CSRF Protection
 const csrfProtection = csrf();
 
 // Sets template engine
@@ -46,19 +48,6 @@ app.use(session({
 app.use(csrfProtection);
 app.use(flash());
 
-//Gets a mongoose model User from the session that is accessible in all requests
-app.use((req, res, next) => {
-    if (!req.session.user) {
-        return next();
-    }
-    User.findById(req.session.user._id)
-    .then(user => {
-        req.user = user;
-        next();
-    })
-    .catch(err => console.log(err));
-})
-
 // Sets isLoggedIn and csrfToken for each request when views are rendered
 app.use((req, res, next) => {
     res.locals.isAuthenticated = req.session.isLoggedIn;
@@ -66,13 +55,41 @@ app.use((req, res, next) => {
     next();
 })
 
+//Gets a mongoose model User from the session that is accessible in all requests
+app.use((req, res, next) => {
+    if (!req.session.user) {
+        return next();
+    }
+    User.findById(req.session.user._id)
+    .then(user => {
+        if (!user) {
+            return next();
+        }
+        req.user = user;
+        next();
+    })
+    .catch(err => {
+        next(new Error(err));
+    });
+})
+
 // Routes
 app.use('/admin', adminRoutes);
 app.use(shopRoutes);
 app.use(authRoutes);
 
-// 404 Error Route
-app.use(errorController.get404)
+// Error Route
+app.get('/500', errorController.get500);
+app.use(errorController.get404);
+
+// error handling middleware
+app.use((error, req, res, next) => {
+    res.status(500).render('500', { 
+        pageTitle: '500 Error', 
+        path: '/500',
+        isAuthenticated: req.session.isLoggedIn,
+    });
+})
 
 mongoose
     .connect(MONGODB_URI)
