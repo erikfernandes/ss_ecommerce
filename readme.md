@@ -11,11 +11,10 @@
 * Mongodb - version 3.6.2
 * Mongoose - version 5.10.9
 * bcryptjs - version 2.4.3
-*
+* Stripe.js
 
 ## Features/TODO
-* File upload/download
-* Handling payments with Stripe.js
+
 
 ## Inspiration
 Project based on Academind NodeJS on Udemy
